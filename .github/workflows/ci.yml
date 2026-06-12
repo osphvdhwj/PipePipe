@@ -13,6 +13,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths-ignore:
       - 'README.md'
       - 'fastlane/**'
@@ -93,3 +95,28 @@ jobs:
         with:
           name: ${{ matrix.file }}
           path: apks/${{ matrix.file }}
+
+  release-apk:
+    runs-on: ubuntu-latest
+    needs: build-client
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: write
+    steps:
+      - name: Download APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: all-apks-in-one(intermediates)
+          path: apks
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Metal Pipe {0}', github.ref_name) || 'Metal Pipe Continuous' }}
+          draft: false
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          files: apks/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
